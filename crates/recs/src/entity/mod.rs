@@ -1,0 +1,82 @@
+use crate::error::RecsError;
+
+/// Represents a unique entity in the RECS system.
+///
+/// Each entity is identified by two numbers:
+/// - An ID that can be reused when entities are destroyed
+/// - A generation number that ensures old references to reused IDs are invalid
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct Entity(u32, u32);
+
+impl Entity {
+    /// Creates a new Entity with the specified ID and generation number
+    pub fn new(id: u32, generation: u32) -> Self {
+        Self(id, generation)
+    }
+
+    /// Returns the entity's ID
+    pub fn id(&self) -> u32 {
+        self.0
+    }
+
+    /// Returns the entity's generation number
+    pub fn generation(&self) -> u32 {
+        self.1
+    }
+}
+
+/// Manages entity lifecycle, including creation, destruction, and validation.
+///
+/// The EntityManager maintains:
+/// - A list of generation numbers for each entity ID
+/// - A list of freed entity IDs that can be reused
+pub struct EntityManager {
+    /// Generation numbers for each entity ID
+    generations: Vec<u32>,
+    /// List of entity IDs that can be reused
+    free_list: Vec<usize>,
+}
+
+impl EntityManager {
+    /// Creates a new empty EntityManager
+    pub fn new() -> Self {
+        Self {
+            generations: Vec::new(),
+            free_list: Vec::new(),
+        }
+    }
+
+    /// Creates a new entity with a unique ID and generation number.
+    /// If there are freed IDs available, one will be reused with an incremented generation.
+    pub fn create_entity(&mut self) -> Entity {
+        if let Some(index) = self.free_list.pop() {
+            self.generations[index] += 1;
+            let generation = self.generations[index];
+            Entity(index as u32, generation)
+        } else {
+            let index = self.generations.len();
+            self.generations.push(1);
+            Entity(index as u32, 1)
+        }
+    }
+
+    /// Destroys an entity, making its ID available for reuse.
+    /// Returns an error if the entity is invalid.
+    pub fn destroy_entity(&mut self, entity: Entity) -> Result<(), RecsError> {
+        if !self.is_valid(entity) {
+            return Err(RecsError::InvalidEntity(entity));
+        }
+
+        let index = entity.id() as usize;
+        self.free_list.push(index);
+
+        Ok(())
+    }
+
+    /// Checks if an entity reference is still valid by comparing its generation
+    /// number with the current generation for that entity ID.
+    pub fn is_valid(&self, entity: Entity) -> bool {
+        let index = entity.0 as usize;
+        index < self.generations.len() && self.generations[index] == entity.1
+    }
+}

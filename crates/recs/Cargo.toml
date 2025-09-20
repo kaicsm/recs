@@ -1,0 +1,7 @@
+[package]
+name = "recs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+recs_macros = { path = "../recs_macros" }
