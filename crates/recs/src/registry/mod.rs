@@ -197,7 +197,8 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
-    /// #[derive(Debug, Clone)]
+    /// # use recs::prelude::{Registry, Resource};
+    /// #[derive(Resource, Debug, Clone)]
     /// struct GameSettings {
     ///     volume: f32,
     ///     difficulty: u8,
@@ -205,6 +206,7 @@ impl Registry {
     ///
     /// let mut registry = Registry::new();
     /// registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
+    /// # assert!(registry.has_resource::<GameSettings>());
     /// ```
     pub fn insert_resource<R: Resource>(&mut self, resource: R) {
         self.resources.insert(resource);
@@ -214,9 +216,15 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
+    /// # use recs::prelude::{Registry, Resource};
+    /// # #[derive(Resource, Debug, Clone)]
+    /// # struct GameSettings { volume: f32, difficulty: u8 }
+    /// # let mut registry = Registry::new();
+    /// # registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
     /// let settings = registry.get_resource::<GameSettings>();
     /// if let Some(settings) = settings {
     ///     println!("Volume: {}", settings.volume);
+    /// #   assert_eq!(settings.volume, 0.8);
     /// }
     /// ```
     pub fn get_resource<R: Resource>(&self) -> Option<&R> {
@@ -227,9 +235,15 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
+    /// # use recs::prelude::{Registry, Resource};
+    /// # #[derive(Resource, Debug, Clone)]
+    /// # struct GameSettings { volume: f32, difficulty: u8 }
+    /// # let mut registry = Registry::new();
+    /// # registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
     /// if let Some(mut settings) = registry.get_resource_mut::<GameSettings>() {
     ///     settings.volume = 0.9;
     /// }
+    /// # assert_eq!(registry.get_resource::<GameSettings>().unwrap().volume, 0.9);
     /// ```
     pub fn get_resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
         self.resources.get_mut::<R>()
@@ -239,7 +253,14 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
+    /// # use recs::prelude::{Registry, Resource};
+    /// # #[derive(Resource, Debug, Clone, PartialEq)]
+    /// # struct GameSettings { volume: f32, difficulty: u8 }
+    /// # let mut registry = Registry::new();
+    /// # registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
     /// let settings = registry.remove_resource::<GameSettings>();
+    /// # assert_eq!(settings, Some(GameSettings { volume: 0.8, difficulty: 2 }));
+    /// # assert!(!registry.has_resource::<GameSettings>());
     /// ```
     pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
         self.resources.remove::<R>()
@@ -249,9 +270,15 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
+    /// # use recs::prelude::{Registry, Resource};
+    /// # #[derive(Resource, Debug, Clone)]
+    /// # struct GameSettings { volume: f32, difficulty: u8 }
+    /// # let mut registry = Registry::new();
+    /// # registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
     /// if registry.has_resource::<GameSettings>() {
     ///     println!("Game settings are configured!");
     /// }
+    /// # assert!(registry.has_resource::<GameSettings>());
     /// ```
     pub fn has_resource<R: Resource>(&self) -> bool {
         self.resources.contains::<R>()
@@ -261,7 +288,12 @@ impl Registry {
     ///
     /// # Example
     /// ```rust
+    /// # use recs::prelude::{Registry, Resource};
+    /// # #[derive(Resource, Debug, Clone, Default)]
+    /// # struct GameSettings { volume: f32, difficulty: u8 }
+    /// # let mut registry = Registry::new();
     /// registry.init_resource::<GameSettings>();
+    /// # assert!(registry.has_resource::<GameSettings>());
     /// ```
     pub fn init_resource<R: Resource + Default>(&mut self) {
         if !self.has_resource::<R>() {
