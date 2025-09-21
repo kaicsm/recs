@@ -50,7 +50,6 @@ impl EntityManager {
     /// If there are freed IDs available, one will be reused with an incremented generation.
     pub fn create_entity(&mut self) -> Entity {
         if let Some(index) = self.free_list.pop() {
-            self.generations[index] += 1;
             let generation = self.generations[index];
             Entity(index as u32, generation)
         } else {
@@ -68,6 +67,7 @@ impl EntityManager {
         }
 
         let index = entity.id() as usize;
+        self.generations[index] += 1;
         self.free_list.push(index);
 
         Ok(())
