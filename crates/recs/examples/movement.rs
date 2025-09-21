@@ -1,4 +1,4 @@
-use recs::{Component, query::Query, registry::Registry};
+use recs::prelude::*;
 
 #[derive(Component)]
 struct Position {

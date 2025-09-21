@@ -11,6 +11,7 @@ use crate::{
     error::RecsError,
     query::{QueryIter, QueryParam},
     registry::bundle::ComponentBundle,
+    resource::{Resource, ResourceStorage},
     system::{BoxedSystem, IntoSystem},
 };
 
@@ -27,6 +28,8 @@ pub struct Registry {
     entity_manager: EntityManager,
     /// Stores components for all entities, organized by component type
     pub(crate) components: HashMap<TypeId, Box<dyn ComponentStorage>>,
+    /// Stores resources (singleton data) accessible by systems
+    pub(crate) resources: ResourceStorage,
     /// List of systems to be executed
     systems: Vec<BoxedSystem>,
 }
@@ -37,6 +40,7 @@ impl Registry {
         Self {
             entity_manager: EntityManager::new(),
             components: HashMap::new(),
+            resources: ResourceStorage::new(),
             systems: Vec::new(),
         }
     }
@@ -186,6 +190,83 @@ impl Registry {
     /// Returns the number of registered systems
     pub fn system_count(&self) -> usize {
         self.systems.len()
+    }
+
+    /// Inserts a resource into the registry.
+    /// If a resource of the same type already exists, it will be replaced.
+    ///
+    /// # Example
+    /// ```rust
+    /// #[derive(Debug, Clone)]
+    /// struct GameSettings {
+    ///     volume: f32,
+    ///     difficulty: u8,
+    /// }
+    ///
+    /// let mut registry = Registry::new();
+    /// registry.insert_resource(GameSettings { volume: 0.8, difficulty: 2 });
+    /// ```
+    pub fn insert_resource<R: Resource>(&mut self, resource: R) {
+        self.resources.insert(resource);
+    }
+
+    /// Gets a reference to a resource if it exists
+    ///
+    /// # Example
+    /// ```rust
+    /// let settings = registry.get_resource::<GameSettings>();
+    /// if let Some(settings) = settings {
+    ///     println!("Volume: {}", settings.volume);
+    /// }
+    /// ```
+    pub fn get_resource<R: Resource>(&self) -> Option<&R> {
+        self.resources.get::<R>()
+    }
+
+    /// Gets a mutable reference to a resource if it exists
+    ///
+    /// # Example
+    /// ```rust
+    /// if let Some(mut settings) = registry.get_resource_mut::<GameSettings>() {
+    ///     settings.volume = 0.9;
+    /// }
+    /// ```
+    pub fn get_resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
+        self.resources.get_mut::<R>()
+    }
+
+    /// Removes a resource from the registry and returns it
+    ///
+    /// # Example
+    /// ```rust
+    /// let settings = registry.remove_resource::<GameSettings>();
+    /// ```
+    pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
+        self.resources.remove::<R>()
+    }
+
+    /// Checks if a resource of the given type exists
+    ///
+    /// # Example
+    /// ```rust
+    /// if registry.has_resource::<GameSettings>() {
+    ///     println!("Game settings are configured!");
+    /// }
+    /// ```
+    pub fn has_resource<R: Resource>(&self) -> bool {
+        self.resources.contains::<R>()
+    }
+
+    /// Inserts a resource with a default value if it doesn't exist
+    ///
+    /// # Example
+    /// ```rust
+    /// registry.init_resource::<GameSettings>();
+    /// ```
+    pub fn init_resource<R: Resource + Default>(&mut self) {
+        if !self.has_resource::<R>() {
+            self.insert_resource(R::default());
+        }
     }
 }
 
