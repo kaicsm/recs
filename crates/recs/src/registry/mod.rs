@@ -9,8 +9,8 @@ use crate::{
     component::{Component, ComponentStorage, sparse_set::SparseSet},
     entity::{Entity, EntityManager},
     error::RecsError,
+    query::{Query, QueryIter},
     registry::bundle::ComponentBundle,
-    system::query::{Query, QueryIter},
 };
 
 /// The main registry that manages all entities and their components in the RECS system.
