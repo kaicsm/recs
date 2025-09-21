@@ -179,10 +179,7 @@ impl<'a, R: Resource> OptionalResMut<'a, R> {
     }
 
     pub fn as_mut(&mut self) -> Option<&mut R> {
-        match &mut self.resource {
-            Some(r) => Some(*r),
-            None => None,
-        }
+        self.resource.as_mut().map(|r| &mut **r)
     }
 }
 
