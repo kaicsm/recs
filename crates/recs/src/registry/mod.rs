@@ -9,8 +9,9 @@ use crate::{
     component::{Component, ComponentStorage, sparse_set::SparseSet},
     entity::{Entity, EntityManager},
     error::RecsError,
-    query::{Query, QueryIter},
+    query::{QueryIter, QueryParam},
     registry::bundle::ComponentBundle,
+    system::{BoxedSystem, IntoSystem},
 };
 
 /// The main registry that manages all entities and their components in the RECS system.
@@ -20,11 +21,14 @@ use crate::{
 /// - Adding and removing components from entities
 /// - Querying entities with specific component combinations
 /// - Managing component storage and lifecycle
+/// - Running systems that operate on entities
 pub struct Registry {
     /// Manages entity creation, destruction and validation
     entity_manager: EntityManager,
     /// Stores components for all entities, organized by component type
     pub(crate) components: HashMap<TypeId, Box<dyn ComponentStorage>>,
+    /// List of systems to be executed
+    systems: Vec<BoxedSystem>,
 }
 
 impl Registry {
@@ -33,6 +37,7 @@ impl Registry {
         Self {
             entity_manager: EntityManager::new(),
             components: HashMap::new(),
+            systems: Vec::new(),
         }
     }
 
@@ -137,7 +142,7 @@ impl Registry {
         Err(RecsError::ComponentNotFound(type_id))
     }
 
-    pub fn query<'q, Q: Query<'q>>(&'q mut self) -> QueryIter<'q, Q> {
+    pub fn query<'q, Q: QueryParam<'q>>(&'q mut self) -> QueryIter<'q, Q> {
         Q::iter(self)
     }
 
@@ -147,5 +152,46 @@ impl Registry {
             "Failed to add bundle to newly created entity. This is a bug in the RECS library.",
         );
         entity
+    }
+
+    /// Adds a system to the registry
+    pub fn add_system<S, Params>(&mut self, system: S)
+    where
+        S: IntoSystem<Params>,
+        S::System: 'static,
+    {
+        self.systems.push(Box::new(system.into_system()));
+    }
+
+    /// Runs all registered systems in order
+    pub fn run_systems(&mut self) {
+        // We need to be careful here because we're borrowing self mutably
+        // We'll use raw pointers to work around the borrow checker
+        let registry_ptr = self as *mut Registry;
+
+        for system in &mut self.systems {
+            // Safety: We know the registry is valid for the duration of this call
+            // and we're not storing the reference anywhere
+            unsafe {
+                system.run(&mut *registry_ptr);
+            }
+        }
+    }
+
+    /// Clears all systems from the registry
+    pub fn clear_systems(&mut self) {
+        self.systems.clear();
+    }
+
+    /// Returns the number of registered systems
+    pub fn system_count(&self) -> usize {
+        self.systems.len()
+    }
+}
+
+/// Implementation for spawning single components
+impl<C: Component + 'static> ComponentBundle for C {
+    fn add_to_entity(self, registry: &mut Registry, entity: Entity) -> Result<(), RecsError> {
+        registry.add_component(entity, self)
     }
 }

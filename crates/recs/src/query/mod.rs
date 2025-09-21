@@ -6,18 +6,7 @@ use crate::{
 };
 
 /// A trait for querying entities with specific component combinations.
-///
-/// This trait is implemented for tuples of up to 32 component references,
-/// allowing you to query entities that have all the specified components.
-///
-/// # Example
-/// ```
-/// // Query entities that have both Position and Velocity components
-/// for (pos, vel) in registry.query::<(&Position, &Velocity)>() {
-///     // Process components
-/// }
-/// ```
-pub trait Query<'q> {
+pub trait QueryParam<'q> {
     /// The type returned by the query iterator
     type Item;
 
@@ -27,9 +16,34 @@ pub trait Query<'q> {
         Self: Sized;
 }
 
+/// A standalone query that can be passed to systems
+pub struct Query<'q, Q> {
+    registry: &'q mut Registry,
+    _phantom: PhantomData<Q>,
+}
+
+impl<'q, Q> Query<'q, Q> {
+    pub fn new(registry: &'q mut Registry) -> Self {
+        Self {
+            registry,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'q, Q: QueryParam<'q>> IntoIterator for Query<'q, Q>
+where
+    QueryIter<'q, Q>: Iterator<Item = Q::Item>,
+{
+    type Item = Q::Item;
+    type IntoIter = QueryIter<'q, Q>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Q::iter(self.registry)
+    }
+}
+
 /// A helper trait for query items.
-///
-/// Implemented for `&C` and `&mut C` to obtain components in immutable or mutable form.
 pub trait QueryItem<'q> {
     type Component: Component;
     type Item;
@@ -93,7 +107,7 @@ impl<'q, C: Component + 'static> QueryItem<'q> for &mut C {
     }
 }
 
-pub struct QueryIter<'q, Q: Query<'q>> {
+pub struct QueryIter<'q, Q: QueryParam<'q>> {
     registry: &'q mut Registry,
     entity_index: usize,
     _phantom: PhantomData<Q>,
@@ -101,7 +115,7 @@ pub struct QueryIter<'q, Q: Query<'q>> {
 
 macro_rules! impl_query_for_tuple {
     ($($name:ident),+) => {
-        impl<'q, $($name: QueryItem<'q>),+> Query<'q> for ($($name,)+) {
+        impl<'q, $($name: QueryItem<'q>),+> QueryParam<'q> for ($($name,)+) {
             type Item = ($($name::Item,)+);
 
             fn iter(registry: &'q mut Registry) -> QueryIter<'q, Self> {

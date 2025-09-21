@@ -1,4 +1,4 @@
-use recs::{Component, registry::Registry};
+use recs::{Component, query::Query, registry::Registry};
 
 #[derive(Component)]
 struct Position {
@@ -17,16 +17,18 @@ fn main() {
 
     let entity = registry.spawn((Position { x: 0, y: 0 }, Velocity { dx: 1, dy: 0 }));
 
+    registry.add_system(movement_system);
+
     for _ in 0..100 {
-        movement_system(&mut registry);
+        registry.run_systems();
 
         let pos = registry.get_component::<Position>(entity).unwrap();
         println!("{}", pos.x);
     }
 }
 
-fn movement_system(registry: &mut Registry) {
-    for (pos, vel) in registry.query::<(&mut Position, &Velocity)>() {
+fn movement_system(query: Query<(&mut Position, &Velocity)>) {
+    for (pos, vel) in query {
         pos.x += vel.dx;
         pos.y += vel.dy;
     }
