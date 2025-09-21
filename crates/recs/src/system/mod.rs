@@ -147,3 +147,118 @@ impl_system!(
 impl_system!(
     P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
 );
+
+#[cfg(test)]
+mod tests {
+    use crate::component::Component;
+
+    use super::*;
+
+    #[derive(Debug, PartialEq)]
+    struct Position {
+        x: f32,
+    }
+
+    impl Component for Position {}
+
+    #[derive(Debug, PartialEq)]
+    struct Velocity {
+        dx: f32,
+    }
+
+    impl Component for Velocity {}
+
+    #[derive(Debug, PartialEq)]
+    struct Time {
+        delta: f32,
+    }
+
+    impl Resource for Time {}
+
+    #[derive(Default, Debug, PartialEq)]
+    struct Counter {
+        value: i32,
+    }
+
+    impl Resource for Counter {}
+
+    fn movement_system(query: Query<(&mut Position, &Velocity)>) {
+        for (pos, vel) in query {
+            pos.x += vel.dx;
+        }
+    }
+
+    fn time_reader_system(time: Res<Time>, mut counter: ResMut<Counter>) {
+        if time.delta > 0.0 {
+            counter.value += 1;
+        }
+    }
+
+    fn optional_resource_system(time: OptionalRes<Time>, mut counter: ResMut<Counter>) {
+        if time.is_some() {
+            counter.value = 10;
+        } else {
+            counter.value = -10;
+        }
+    }
+
+    #[test]
+    fn test_system_with_query() {
+        let mut registry = Registry::new();
+        let entity = registry.spawn((Position { x: 10.0 }, Velocity { dx: 5.0 }));
+
+        registry.add_system(movement_system);
+        registry.run_systems();
+
+        let pos = registry.get_component::<Position>(entity).unwrap();
+        assert_eq!(pos.x, 15.0);
+    }
+
+    #[test]
+    fn test_system_with_resources() {
+        let mut registry = Registry::new();
+        registry.insert_resource(Time { delta: 0.1 });
+        registry.init_resource::<Counter>();
+
+        registry.add_system(time_reader_system);
+        registry.run_systems();
+
+        let counter = registry.get_resource::<Counter>().unwrap();
+        assert_eq!(counter.value, 1);
+    }
+
+    #[test]
+    fn test_system_with_optional_resource_present() {
+        let mut registry = Registry::new();
+        registry.insert_resource(Time { delta: 0.1 });
+        registry.init_resource::<Counter>();
+
+        registry.add_system(optional_resource_system);
+        registry.run_systems();
+
+        let counter = registry.get_resource::<Counter>().unwrap();
+        assert_eq!(counter.value, 10);
+    }
+
+    #[test]
+    fn test_system_with_optional_resource_absent() {
+        let mut registry = Registry::new();
+        registry.init_resource::<Counter>();
+
+        registry.add_system(optional_resource_system);
+        registry.run_systems();
+
+        let counter = registry.get_resource::<Counter>().unwrap();
+        assert_eq!(counter.value, -10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Resource recs::system::tests::Time not found")]
+    fn test_system_panics_on_missing_required_resource() {
+        let mut registry = Registry::new();
+        registry.init_resource::<Counter>();
+
+        registry.add_system(time_reader_system);
+        registry.run_systems();
+    }
+}

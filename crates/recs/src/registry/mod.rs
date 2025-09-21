@@ -276,3 +276,83 @@ impl<C: Component + 'static> ComponentBundle for C {
         registry.add_component(entity, self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, PartialEq)]
+    struct Position {
+        x: i32,
+    }
+
+    impl Component for Position {}
+
+    #[derive(Debug, PartialEq)]
+    struct Velocity {
+        dx: i32,
+    }
+
+    impl Component for Velocity {}
+
+    #[derive(Debug, PartialEq)]
+    struct GameTime {
+        time: f32,
+    }
+
+    impl Resource for GameTime {}
+
+    #[test]
+    fn test_spawn_and_get_component() {
+        let mut registry = Registry::new();
+        let entity = registry.spawn((Position { x: 10 }, Velocity { dx: -1 }));
+
+        let pos = registry.get_component::<Position>(entity).unwrap();
+        assert_eq!(pos, &Position { x: 10 });
+
+        let vel = registry.get_component::<Velocity>(entity).unwrap();
+        assert_eq!(vel, &Velocity { dx: -1 });
+    }
+
+    #[test]
+    fn test_destroy_entity_removes_all_components() {
+        let mut registry = Registry::new();
+        let entity = registry.spawn((Position { x: 10 }, Velocity { dx: -1 }));
+
+        assert!(registry.get_component::<Position>(entity).is_some());
+
+        registry.destroy_entity(entity).unwrap();
+
+        assert!(registry.get_component::<Position>(entity).is_none());
+        assert!(registry.get_component::<Velocity>(entity).is_none());
+    }
+
+    #[test]
+    fn test_simple_query() {
+        let mut registry = Registry::new();
+        registry.spawn((Position { x: 1 },));
+        registry.spawn((Position { x: 2 }, Velocity { dx: 10 }));
+        registry.spawn((Velocity { dx: 20 },));
+
+        let mut count = 0;
+        for (pos,) in registry.query::<(&Position,)>() {
+            assert!(pos.x == 1 || pos.x == 2);
+            count += 1;
+        }
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_resource_management() {
+        let mut registry = Registry::new();
+        registry.insert_resource(GameTime { time: 0.0 });
+
+        let time_res = registry.get_resource::<GameTime>().unwrap();
+        assert_eq!(time_res, &GameTime { time: 0.0 });
+
+        let time_res_mut = registry.get_resource_mut::<GameTime>().unwrap();
+        time_res_mut.time = 1.0;
+
+        assert_eq!(registry.get_resource::<GameTime>().unwrap().time, 1.0);
+    }
+}

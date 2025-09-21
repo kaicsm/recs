@@ -251,3 +251,129 @@ impl_query_for_tuple!(
     Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12, Q13, Q14, Q15, Q16, Q17, Q18, Q19, Q20,
     Q21, Q22, Q23, Q24, Q25, Q26, Q27, Q28, Q29, Q30, Q31
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    struct Position {
+        x: f32,
+        y: f32,
+    }
+
+    impl Component for Position {}
+
+    #[derive(Debug, PartialEq)]
+    struct Velocity {
+        dx: f32,
+        dy: f32,
+    }
+
+    impl Component for Velocity {}
+
+    #[derive(Debug, PartialEq)]
+    struct PlayerTag;
+
+    impl Component for PlayerTag {}
+
+    #[test]
+    fn test_query_single_immutable() {
+        let mut registry = Registry::new();
+        let _e1 = registry.spawn((Position { x: 1.0, y: 1.0 },));
+        let _e2 = registry.spawn((Position { x: 2.0, y: 2.0 }, PlayerTag));
+        registry.spawn((PlayerTag,));
+
+        let mut count = 0;
+        let mut total_x = 0.0;
+        for (pos,) in registry.query::<(&Position,)>() {
+            count += 1;
+            total_x += pos.x;
+        }
+
+        assert_eq!(count, 2);
+        assert_eq!(total_x, 3.0);
+    }
+
+    #[test]
+    fn test_query_single_mutable() {
+        let mut registry = Registry::new();
+        let entity = registry.spawn((Position { x: 1.0, y: 1.0 },));
+
+        for (pos,) in registry.query::<(&mut Position,)>() {
+            pos.x = 100.0;
+        }
+
+        let changed_pos = registry.get_component::<Position>(entity).unwrap();
+        assert_eq!(changed_pos.x, 100.0);
+    }
+
+    #[test]
+    fn test_query_multiple_components() {
+        let mut registry = Registry::new();
+        let _e1 = registry.spawn((Position { x: 1.0, y: 1.0 }, Velocity { dx: 1.0, dy: 0.0 }));
+        registry.spawn(Position { x: 2.0, y: 2.0 });
+        registry.spawn(Velocity { dx: 2.0, dy: 0.0 });
+
+        let mut count = 0;
+        for (pos, vel) in registry.query::<(&Position, &Velocity)>() {
+            count += 1;
+            assert_eq!(pos.x, 1.0);
+            assert_eq!(vel.dx, 1.0);
+        }
+        assert_eq!(
+            count, 1,
+            "The query should find only one entity with both components"
+        );
+    }
+
+    #[test]
+    fn test_query_mutable_and_immutable() {
+        let mut registry = Registry::new();
+        let entity = registry.spawn((Position { x: 1.0, y: 1.0 }, Velocity { dx: 5.0, dy: 0.0 }));
+
+        for (pos, vel) in registry.query::<(&mut Position, &Velocity)>() {
+            pos.x += vel.dx;
+        }
+
+        let changed_pos = registry.get_component::<Position>(entity).unwrap();
+        assert_eq!(changed_pos.x, 6.0);
+    }
+
+    #[test]
+    fn test_query_iterates_over_smallest_set() {
+        let mut registry = Registry::new();
+        for i in 0..100 {
+            if i < 3 {
+                registry.spawn((
+                    PlayerTag,
+                    Position {
+                        x: i as f32,
+                        y: 0.0,
+                    },
+                ));
+            } else {
+                registry.spawn((PlayerTag,));
+            }
+        }
+
+        let mut count = 0;
+        for (_, _tag) in registry.query::<(&Position, &PlayerTag)>() {
+            count += 1;
+        }
+
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_empty_query_result() {
+        let mut registry = Registry::new();
+        registry.spawn((Position { x: 1.0, y: 1.0 },));
+
+        let mut count = 0;
+        for (_pos, _vel) in registry.query::<(&Position, &Velocity)>() {
+            count += 1;
+        }
+        assert_eq!(count, 0);
+    }
+}

@@ -154,3 +154,64 @@ impl<C: Component + 'static> ComponentStorage for SparseSet<C> {
         self.remove(id).map(|c| Box::new(c) as Box<dyn Any>)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::Entity;
+
+    #[derive(Debug, PartialEq)]
+    struct Position {
+        x: i32,
+        y: i32,
+    }
+    impl Component for Position {}
+
+    fn create_entity(id: u32) -> Entity {
+        Entity::new(id, 1)
+    }
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut ss = SparseSet::<Position>::new();
+        let entity = create_entity(5);
+
+        ss.insert(entity, Position { x: 10, y: 20 });
+
+        let component = ss.get(5).unwrap();
+        assert_eq!(component, &Position { x: 10, y: 20 });
+
+        let component_mut = ss.get_mut(5).unwrap();
+        component_mut.x = 99;
+
+        assert_eq!(ss.get(5).unwrap(), &Position { x: 99, y: 20 });
+    }
+
+    #[test]
+    fn test_remove_component_swap_back() {
+        let mut ss = SparseSet::<Position>::new();
+        let entity0 = create_entity(0);
+        let entity1 = create_entity(1);
+        let entity2 = create_entity(2);
+
+        ss.insert(entity0, Position { x: 0, y: 0 });
+        ss.insert(entity1, Position { x: 1, y: 1 });
+        ss.insert(entity2, Position { x: 2, y: 2 });
+
+        assert_eq!(ss.len(), 3);
+
+        let removed = ss.remove(entity1.id() as usize);
+        assert_eq!(removed, Some(Position { x: 1, y: 1 }));
+
+        assert_eq!(ss.len(), 2);
+        assert!(ss.get(entity1.id() as usize).is_none());
+        assert_eq!(
+            ss.get(entity2.id() as usize),
+            Some(&Position { x: 2, y: 2 })
+        );
+        assert_eq!(
+            ss.get(entity0.id() as usize),
+            Some(&Position { x: 0, y: 0 })
+        );
+    }
+}

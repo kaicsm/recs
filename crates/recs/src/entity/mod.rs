@@ -80,3 +80,56 @@ impl EntityManager {
         index < self.generations.len() && self.generations[index] == entity.1
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_first_entity() {
+        let mut manager = EntityManager::new();
+        let entity = manager.create_entity();
+
+        assert_eq!(entity.id(), 0);
+        assert_eq!(entity.generation(), 1);
+        assert!(manager.is_valid(entity));
+    }
+
+    #[test]
+    fn test_create_multiple_entities() {
+        let mut manager = EntityManager::new();
+        let entity1 = manager.create_entity();
+        let entity2 = manager.create_entity();
+
+        assert_eq!(entity1.id(), 0);
+        assert_eq!(entity2.id(), 1);
+    }
+
+    #[test]
+    fn test_destroy_and_reuse_entity_id() {
+        let mut manager = EntityManager::new();
+        let entity1 = manager.create_entity();
+
+        assert!(manager.destroy_entity(entity1).is_ok());
+        assert!(!manager.is_valid(entity1));
+
+        let entity2 = manager.create_entity();
+
+        assert_eq!(entity2.id(), 0);
+        assert_eq!(entity2.generation(), 2);
+        assert!(manager.is_valid(entity2));
+
+        let old_invalid_entity = Entity::new(0, 1);
+        assert!(!manager.is_valid(old_invalid_entity));
+    }
+
+    #[test]
+    fn test_destroy_invalid_entity_returns_error() {
+        let mut manager = EntityManager::new();
+        let invalid_entity = Entity::new(10, 1);
+
+        let result = manager.destroy_entity(invalid_entity);
+        assert!(result.is_err());
+        matches!(result.unwrap_err(), RecsError::InvalidEntity(_));
+    }
+}
